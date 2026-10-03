@@ -1,0 +1,7 @@
+../Core/Src/crsf.c:12:16:crc8	24	static
+../Core/Src/crsf.c:23:13:unpack	32	static
+../Core/Src/crsf.c:35:6:crsf_rx_byte	16	static
+../Core/Src/crsf.c:59:6:crsf_check_link	8	static
+../Core/Src/crsf.c:67:9:crsf_get_channel	16	static
+../Core/Src/crsf.c:70:6:crsf_init	16	static
+../Core/Src/crsf.c:81:6:crsf_is_link_up	4	static

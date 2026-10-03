@@ -1,0 +1,3 @@
+../Core/Src/servo.c:22:13:pin_mode	32	static
+../Core/Src/servo.c:30:6:servo_init	16	static
+../Core/Src/servo.c:34:6:servo_set_us	16	static
