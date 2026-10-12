@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "servo.h"
@@ -49,7 +50,7 @@ TIM_HandleTypeDef htim3;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-static uint8_t rxByte;    //HAL 接收單byte的變量
+static uint8_t rxByte;    //HAL 接收單byte的變�??
 static volatile uint8_t rxRing[RX_RING_SIZE]; //緩衝-環行
 static volatile uint16_t rxHead; //Pointer
 static volatile uint16_t rxTail;   //Pointer
@@ -109,9 +110,9 @@ int main(void)
   HAL_UART_Receive_IT(&huart2,&rxByte,1);
 
   /*HAL_UART_Receive_IT 函數:
-   * huart：指向 UART 句柄的指標（例如 &huart1），代表要操作哪一個串口。
-   * pData：接收數據的緩衝區（Buffer）指標，用來存放讀取到的資料。
-   * Size：預期接收的字節數（Byte Count）。
+   * huart：指�?? UART 句柄的指標（例如 &huart1），代表要操作哪�??個串口�??
+   * pData：接收數據的緩衝�??（Buffer）指標，用來存放�??取到的資料�??
+   * Size：預期接收的字節數（Byte Count）�??
    */
   /* USER CODE END 2 */
 
@@ -126,7 +127,7 @@ int main(void)
 	  {
 		  uint8_t b = rxRing[rxTail];
 		  rxTail = (uint16_t)((rxTail + 1) % RX_RING_SIZE);
-		  crsf_rx_byte(b); //call crsf函數解析數據，讓他們來執行飛行操作和輸入PWM
+		  crsf_rx_byte(b); //call crsf函數解析數據，讓他�?�來執行飛行操作和輸入PWM
 	  }
 	  crsf_check_link(); //失控檢查
   }
@@ -370,12 +371,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   if (huart->Instance == USART2)
   {
     uint16_t next = (uint16_t)((rxHead + 1) % RX_RING_SIZE);
-    if (next != rxTail)            /* 没满才存;满了就丢,不覆盖未读数据 */
+    if (next != rxTail)            /* 没满才存;满了就丢,不覆盖未读数�?? */
     {
       rxRing[rxHead] = rxByte;
       rxHead = next;
     }
-    HAL_UART_Receive_IT(&huart2, &rxByte, 1);   /* ★ 必须重新挂,否则只收1字节就停 */
+    HAL_UART_Receive_IT(&huart2, &rxByte, 1);   /* �?? 必须重新�??,否则只收1字节就停 */
   }
 }
 
@@ -385,12 +386,13 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
   {
     __HAL_UART_CLEAR_OREFLAG(huart);   /* 溢出 */
     __HAL_UART_CLEAR_NEFLAG(huart);    /* 噪声 */
-    __HAL_UART_CLEAR_FEFLAG(huart);    /* 帧错误 */
+    __HAL_UART_CLEAR_FEFLAG(huart);    /* 帧错�?? */
     __HAL_UART_CLEAR_PEFLAG(huart);    /* 校验 */
     huart->ErrorCode = HAL_UART_ERROR_NONE;
     HAL_UART_Receive_IT(&huart2, &rxByte, 1);   /* 出错后自恢复 */
   }
 }
+
 
 /* USER CODE END 4 */
 
