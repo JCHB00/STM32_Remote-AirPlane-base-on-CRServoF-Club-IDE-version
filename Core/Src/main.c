@@ -135,7 +135,7 @@ int main(void)
 	  //already used Direct Memory Access to dealing the data
 	  Motor_Voltage = ADC_DMA_Buffer[0]/4095.0  * 3.3; //Output current voltage輸出當前電壓
 	  Cell_Box_Voltage = ADC_DMA_Buffer[1]/4095.0  * 3.3;
-	  if(Motor_Voltage <= 4.0 || Cell_Box_Voltage <= 4.0)
+	  if(Motor_Voltage/0.5 <= 4.0 || Cell_Box_Voltage/0.5 <= 4.0)//這裏的數值需要調整
 	  {
 		  //Buzzer報警 + LED變色
 	  }
