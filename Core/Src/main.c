@@ -115,7 +115,7 @@ int main(void)
   servo_init();
   crsf_init();
   HAL_UART_Receive_IT(&huart2,&rxByte,1);
-  HAL_ADCE1_Calibration_Start(&hadc1);
+  HAL_ADCEx_Calibration_Start(&hadc1);
 
   uint16_t ADC_DMA_Buffer[ADC_DMA_BUFFER_SIZE];
   float Motor_Voltage = 0;
