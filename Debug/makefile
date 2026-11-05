@@ -60,8 +60,8 @@ all: main-build
 main-build: Project_ver_C8T6.elf secondary-outputs
 
 # Tool invocations
-Project_ver_C8T6.elf Project_ver_C8T6.map: $(OBJS) $(USER_OBJS) D:\Tools\STM32\STM32_Software\Project_ver_C8T6\STM32F103C8TX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Project_ver_C8T6.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"D:\Tools\STM32\STM32_Software\Project_ver_C8T6\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Project_ver_C8T6.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Project_ver_C8T6.elf Project_ver_C8T6.map: $(OBJS) $(USER_OBJS) C:\ust\elec3300\STM32_Remote-AirPlane-base-on-CRServoF-Club-IDE-version\STM32F103C8TX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Project_ver_C8T6.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"C:\ust\elec3300\STM32_Remote-AirPlane-base-on-CRServoF-Club-IDE-version\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Project_ver_C8T6.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 
