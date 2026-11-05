@@ -1,3 +1,4 @@
-../Core/Src/app.c:12:6:packet_channels	24	static
-../Core/Src/app.c:21:6:failsafe_apply	16	static
-../Core/Src/app.c:29:6:led_set	16	static
+../Core/Src/app.c:17:12:apply_throttle_ramp	24	static
+../Core/Src/app.c:38:6:packet_channels	24	static
+../Core/Src/app.c:53:6:failsafe_apply	16	static
+../Core/Src/app.c:61:6:led_set	16	static
