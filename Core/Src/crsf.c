@@ -59,10 +59,14 @@ void crsf_rx_byte(uint8_t b) {            /* 主循环里逐字节喂进来 */
 void crsf_check_link(void) {              /* 主循环里周期调用 */
     if (s_up && (HAL_GetTick() - s_lastMs > 300)) {   /* 原版超时 = 300ms [cite] */
         s_up = false;
-        led_set(false);
-        failsafe_apply();                 /* 触发一次失控保护 */
-    }
+        app_led_pulse(80);
+        if (!app_volt_failsafe_active()) {
+             failsafe_apply(); /* Only apply if voltage is healthy */
+        }
+        app_reset_throttle_ramp();
+    } /* 触发一次失控保护 */
 }
+
 
 int32_t crsf_get_channel(uint8_t ch1) { return s_ch[ch1 - 1]; }  /**/
 

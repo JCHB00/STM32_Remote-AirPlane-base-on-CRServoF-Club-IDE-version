@@ -62,6 +62,9 @@ static volatile uint16_t rxHead; //Pointer
 static volatile uint16_t rxTail;   //Pointer
 
 // Voltage monitoring variables
+
+static volatile uint16_t adc_dma_buffer[ADC_DMA_BUFFER_SIZE] = {0};
+
 static uint16_t vref_history[VREF_HISTORY_LEN];
 static uint16_t ch1_history[CH_HISTORY_LEN];
 static uint16_t ch5_history[CH_HISTORY_LEN];
@@ -71,6 +74,8 @@ static bool vref_filled = false, ch1_filled = false, ch5_filled = false;
 static uint32_t last_voltage_check_ms = 0;
 static uint16_t ch1_warn_count = 0;
 static uint16_t ch5_warn_count = 0;
+static uint16_t ch1_recover_count = 0, ch5_recover_count = 0;
+static uint16_t vdda_fail_count = 0, vdda_recover_count = 0;
 
 typedef enum {
     VOLT_STATE_NORMAL = 0,
@@ -142,7 +147,10 @@ int main(void)
   HAL_UART_Receive_IT(&huart2,&rxByte,1);
   HAL_ADCEx_Calibration_Start(&hadc1);
 
-  uint16_t ADC_DMA_Buffer[ADC_DMA_BUFFER_SIZE];
+  if (HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, ADC_DMA_BUFFER_SIZE) != HAL_OK)
+    {
+        Error_Handler();
+    }
   //float Motor_Voltage = 0;
   //float Cell_Box_Voltage = 0;
   /* USER CODE END 2 */
@@ -151,97 +159,91 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   //HAL_ADC_Start(&hadc2);
   //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, ADC_BUFFER_SIZE)
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ADC_DMA_Buffer, ADC_DMA_BUFFER_SIZE);
+  //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ADC_DMA_Buffer, ADC_DMA_BUFFER_SIZE);
   while (1)
   {
-	  if (HAL_GetTick() - last_voltage_check_ms >= 100) {
-	            last_voltage_check_ms = HAL_GetTick();
+	  app_led_tick();// Must run every loop to handle blinking
 
-	            // Map incoming DMA data: [0] = CH5 (BEC), [1] = CH1 (6V Box), [2] = Vrefint
-	            vref_history[vref_idx++] = ADC_DMA_Buffer[2];
-	            if (vref_idx >= VREF_HISTORY_LEN) { vref_idx = 0; vref_filled = true; }
+      if (HAL_GetTick() - last_voltage_check_ms >= 100) {
+          last_voltage_check_ms = HAL_GetTick();
 
-	            ch1_history[ch1_idx++] = ADC_DMA_Buffer[1];
-	            if (ch1_idx >= CH_HISTORY_LEN) { ch1_idx = 0; ch1_filled = true; }
+          vref_history[vref_idx++] = adc_dma_buffer[2];
+          if (vref_idx >= VREF_HISTORY_LEN) { vref_idx = 0; vref_filled = true; }
+          ch1_history[ch1_idx++] = adc_dma_buffer[1];
+          if (ch1_idx >= CH_HISTORY_LEN) { ch1_idx = 0; ch1_filled = true; }
+          ch5_history[ch5_idx++] = adc_dma_buffer[0];
+          if (ch5_idx >= CH_HISTORY_LEN) { ch5_idx = 0; ch5_filled = true; }
 
-	            ch5_history[ch5_idx++] = ADC_DMA_Buffer[0];
-	            if (ch5_idx >= CH_HISTORY_LEN) { ch5_idx = 0; ch5_filled = true; }
+          uint32_t vref_sum = 0; int vref_n = vref_filled ? VREF_HISTORY_LEN : vref_idx;
+          for (int i = 0; i < vref_n; i++) vref_sum += vref_history[i];
+          uint32_t raw_vref_avg = vref_n ? vref_sum / vref_n : adc_dma_buffer[2];
 
-	            // Compute rolling averages to filter out servo movement noise spikes
-	            uint32_t vref_sum = 0;
-	            int vref_count = vref_filled ? VREF_HISTORY_LEN : vref_idx;
-	            for (int i = 0; i < vref_count; i++) vref_sum += vref_history[i];
-	            uint32_t raw_vref_avg = vref_count > 0 ? (vref_sum / vref_count) : ADC_DMA_Buffer[2];
+          uint32_t ch1_sum = 0; int ch1_n = ch1_filled ? CH_HISTORY_LEN : ch1_idx;
+          for (int i = 0; i < ch1_n; i++) ch1_sum += ch1_history[i];
+          uint32_t raw_ch1_avg = ch1_n ? ch1_sum / ch1_n : adc_dma_buffer[1];
 
-	            uint32_t ch1_sum = 0;
-	            int ch1_count = ch1_filled ? CH_HISTORY_LEN : ch1_idx;
-	            for (int i = 0; i < ch1_count; i++) ch1_sum += ch1_history[i];
-	            uint32_t raw_ch1_avg = ch1_count > 0 ? (ch1_sum / ch1_count) : ADC_DMA_Buffer[1];
+          uint32_t ch5_sum = 0; int ch5_n = ch5_filled ? CH_HISTORY_LEN : ch5_idx;
+          for (int i = 0; i < ch5_n; i++) ch5_sum += ch5_history[i];
+          uint32_t raw_ch5_avg = ch5_n ? ch5_sum / ch5_n : adc_dma_buffer[0];
 
-	            uint32_t ch5_sum = 0;
-	            int ch5_count = ch5_filled ? CH_HISTORY_LEN : ch5_idx;
-	            for (int i = 0; i < ch5_count; i++) ch5_sum += ch5_history[i];
-	            uint32_t raw_ch5_avg = ch5_count > 0 ? (ch5_sum / ch5_count) : ADC_DMA_Buffer[0];
+          float Vdda = 3.3f;
+          if (raw_vref_avg > 0) Vdda = (1.20f * 4095.0f) / (float)raw_vref_avg;
 
-	            // Calculate real Vdda dynamically using the 1.20V internal reference
-	            float Vdda = 3.3f;
-	            if (raw_vref_avg > 0) {
-	                Vdda = (1.20f * 4095.0f) / (float)raw_vref_avg;
-	            }
+          if (Vdda < 3.0f) {
+              vdda_fail_count++; vdda_recover_count = 0;
+              if (vdda_fail_count >= 5) {
+                  state_6V = VOLT_STATE_VDDA_FAIL;
+                  state_BEC = VOLT_STATE_VDDA_FAIL;
+              }
+          } else {
+              vdda_fail_count = 0;
+              if (state_6V == VOLT_STATE_VDDA_FAIL) {
+                  if (++vdda_recover_count >= 10) {
+                      state_6V = VOLT_STATE_NORMAL; state_BEC = VOLT_STATE_NORMAL;
+                      ch1_warn_count = ch5_warn_count = 0;
+                      ch1_recover_count = ch5_recover_count = vdda_recover_count = 0;
+                  }
+              } else {
+                  float V_6V  = (float)raw_ch1_avg * Vdda / 4095.0f * 2.0f;
+                  float V_BEC = (float)raw_ch5_avg * Vdda / 4095.0f * 1.833f;
 
-	            // Check if the microcontroller regulator is collapsing (< 3.0V)
-	            if (Vdda < 3.0f) {
-	                state_6V = VOLT_STATE_VDDA_FAIL;
-	                state_BEC = VOLT_STATE_VDDA_FAIL;
-	            } else {
-	                // Calculate actual voltages using voltage divider scaling factors
-	                float V_6V = (float)raw_ch1_avg * Vdda / 4095.0f * 2.0f;
-	                float V_BEC = (float)raw_ch5_avg * Vdda / 4095.0f * 1.833f;
+                  /* CH1 (6V) */
+                  if (state_6V == VOLT_STATE_CRITICAL) {
+                      if (V_6V >= 5.0f) {
+                          if (++ch1_recover_count >= 10) { state_6V = VOLT_STATE_NORMAL; ch1_warn_count = 0; ch1_recover_count = 0; }
+                      } else ch1_recover_count = 0;
+                  } else if (V_6V < 4.8f) {
+                      if (++ch1_warn_count >= 5) { state_6V = VOLT_STATE_CRITICAL; ch1_recover_count = 0; }
+                  } else if (V_6V < 5.0f) {
+                      if (++ch1_warn_count >= 10) state_6V = VOLT_STATE_WARN;
+                  } else { ch1_warn_count = 0; state_6V = VOLT_STATE_NORMAL; }
 
-	                // CH1 (6V Box) thresholds & debounce counters
-	                if (V_6V < 4.8f) {
-	                    ch1_warn_count++;
-	                    if (ch1_warn_count >= 5) state_6V = VOLT_STATE_CRITICAL; // 500ms continuous drop
-	                } else if (V_6V < 5.0f) {
-	                    ch1_warn_count++;
-	                    if (ch1_warn_count >= 10) state_6V = VOLT_STATE_WARN;     // 1s continuous drop
-	                } else {
-	                    ch1_warn_count = 0;
-	                    state_6V = VOLT_STATE_NORMAL;
-	                }
+                  /* CH5 (BEC) */
+                  if (state_BEC == VOLT_STATE_CRITICAL) {
+                      if (V_BEC >= 4.8f) {
+                          if (++ch5_recover_count >= 5) { state_BEC = VOLT_STATE_NORMAL; ch5_warn_count = 0; ch5_recover_count = 0; }
+                      } else ch5_recover_count = 0;
+                  } else if (V_BEC < 4.6f) {
+                      if (++ch5_warn_count >= 5) { state_BEC = VOLT_STATE_CRITICAL; ch5_recover_count = 0; }
+                  } else if (V_BEC < 4.8f) {
+                      if (++ch5_warn_count >= 5) state_BEC = VOLT_STATE_WARN;
+                  } else { ch5_warn_count = 0; state_BEC = VOLT_STATE_NORMAL; }
+              }
+          }
 
-	                // CH5 (ESC BEC 5V) thresholds & debounce counters
-	                if (V_BEC < 4.6f) {
-	                    ch5_warn_count++;
-	                    if (ch5_warn_count >= 5) state_BEC = VOLT_STATE_CRITICAL; // 500ms critical check
-	                } else if (V_BEC < 4.8f) {
-	                    ch5_warn_count++;
-	                    if (ch5_warn_count >= 5) state_BEC = VOLT_STATE_WARN;     // 500ms warning check
-	                } else {
-	                    ch5_warn_count = 0;
-	                    state_BEC = VOLT_STATE_NORMAL;
-	                }
-	            }
-
-	            // Warning & Critical Safety Actions with Blinking LED Feedback
-	            if (state_6V == VOLT_STATE_CRITICAL || state_BEC == VOLT_STATE_CRITICAL || state_6V == VOLT_STATE_VDDA_FAIL) {
-	                // CRITICAL: Rapidly toggle LED to indicate severe warning condition
-	                led_set(true);
-
-	                // Execute failsafe actions: Cut motor and center control surfaces via app mapping layers[cite: 1]
-	                servo_set_us(2, 1000); // Cut motor throttle channel
-	                servo_set_us(0, 1500); // Center aileron
-	                servo_set_us(1, 1500); // Center elevator
-	                servo_set_us(3, 1500); // Center rudder
-	            }
-	            else if (state_6V == VOLT_STATE_WARN || state_BEC == VOLT_STATE_WARN) {
-	                // WARNING: Slower blink pattern for early warning indication
-	                static uint8_t warn_ticker = 0;
-	                if (++warn_ticker % 2 == 0) {
-	                    led_set(true);
-	                }
-	            }
-	        }
+          /* Output + LED */
+          if (state_6V == VOLT_STATE_CRITICAL || state_BEC == VOLT_STATE_CRITICAL || state_6V == VOLT_STATE_VDDA_FAIL) {
+              app_led_set_mode(LED_MODE_BLINK_FAST);
+              app_set_volt_failsafe(true);
+              failsafe_apply(); // Use standard failsafe array
+          } else if (state_6V == VOLT_STATE_WARN || state_BEC == VOLT_STATE_WARN) {
+              app_led_set_mode(LED_MODE_BLINK_SLOW);
+              app_set_volt_failsafe(false);
+          } else {
+              app_led_set_mode(LED_MODE_OFF);
+              app_set_volt_failsafe(false);
+          }
+      }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

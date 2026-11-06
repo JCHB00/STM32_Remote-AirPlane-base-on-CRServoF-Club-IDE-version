@@ -1,4 +1,10 @@
-../Core/Src/app.c:17:12:apply_throttle_ramp	24	static
-../Core/Src/app.c:38:6:packet_channels	24	static
-../Core/Src/app.c:53:6:failsafe_apply	16	static
-../Core/Src/app.c:61:6:led_set	16	static
+../Core/Src/app.c:25:6:led_set	16	static
+../Core/Src/app.c:31:6:app_led_set_mode	16	static
+../Core/Src/app.c:37:6:app_led_pulse	16	static
+../Core/Src/app.c:43:6:app_led_tick	16	static
+../Core/Src/app.c:70:6:app_set_volt_failsafe	16	static
+../Core/Src/app.c:74:6:app_volt_failsafe_active	4	static
+../Core/Src/app.c:75:6:app_reset_throttle_ramp	4	static
+../Core/Src/app.c:78:12:apply_throttle_ramp	24	static
+../Core/Src/app.c:99:6:packet_channels	24	static
+../Core/Src/app.c:115:6:failsafe_apply	16	static
