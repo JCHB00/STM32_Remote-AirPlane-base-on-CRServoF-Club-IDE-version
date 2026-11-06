@@ -245,11 +245,11 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  while(rxTail != rxHead)//指�?檢查，�?��?有内容就解�?data
+	  while(rxTail != rxHead)//If not full
 	  {
 		  uint8_t b = rxRing[rxTail];
 		  rxTail = (uint16_t)((rxTail + 1) % RX_RING_SIZE);
-		  crsf_rx_byte(b); //call crsf函數解�?數據
+		  crsf_rx_byte(b); //call crsf
 	  }
 	  crsf_check_link(); //失控檢查
   }
