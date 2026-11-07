@@ -100,6 +100,14 @@ static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 //void HAL_UART_RxCpltCallback(UART_HandleTypeDef *);
 //void HAL_UART_ErrorCallback(UART_HandleTypeDef *);
+void BLUE_LED_ON();
+void BLUE_LED_OFF();
+void GREEN_LED_ON();
+void GREEN_LED_OFF();
+void RED_LED_ON();
+void RED_LED_OFF();
+void BUZZER_ON();
+void BUZZER_OFF();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -151,6 +159,17 @@ int main(void)
     {
         Error_Handler();
     }
+
+  //RED_LED_ON();
+  //GREEN_LED_ON();
+  //BLUE_LED_ON();
+  //BUZZER_ON();
+  //HAL_Delay(10);
+  //BUZZER_OFF();
+  //RED_LED_OFF();
+  //GREEN_LED_OFF();
+  //BLUE_LED_OFF();
+
   //float Motor_Voltage = 0;
   //float Cell_Box_Voltage = 0;
   /* USER CODE END 2 */
@@ -572,6 +591,12 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9, GPIO_PIN_RESET);
+
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -586,6 +611,20 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PB6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB7 PB8 PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
@@ -594,12 +633,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
   if (huart->Instance == USART2)
   {
     uint16_t next = (uint16_t)((rxHead + 1) % RX_RING_SIZE);
-    if (next != rxTail)            /* 没满�?存;满了就丢,�?覆盖未读数�??? */
+    if (next != rxTail)
     {
       rxRing[rxHead] = rxByte;
       rxHead = next;
     }
-    HAL_UART_Receive_IT(&huart2, &rxByte, 1);   /* �??? 必须�?新�???,�?�则�?�收1字节就�?� */
+    HAL_UART_Receive_IT(&huart2, &rxByte, 1);
   }
 }
 
@@ -607,16 +646,54 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == USART2)
   {
-    __HAL_UART_CLEAR_OREFLAG(huart);   /* 溢出 */
-    __HAL_UART_CLEAR_NEFLAG(huart);    /* 噪声 */
-    __HAL_UART_CLEAR_FEFLAG(huart);    /* 帧错�??? */
-    __HAL_UART_CLEAR_PEFLAG(huart);    /* 校验 */
+    __HAL_UART_CLEAR_OREFLAG(huart);   /* overflow */
+    __HAL_UART_CLEAR_NEFLAG(huart);    /* noise */
+    __HAL_UART_CLEAR_FEFLAG(huart);    /* data wrong */
+    __HAL_UART_CLEAR_PEFLAG(huart);    /* check again*/
     huart->ErrorCode = HAL_UART_ERROR_NONE;
-    HAL_UART_Receive_IT(&huart2, &rxByte, 1);   /* 出错�?�自�?��? */
+    HAL_UART_Receive_IT(&huart2, &rxByte, 1);   /* wrong from receive */
   }
 }
 
+void BLUE_LED_ON()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9,GPIO_PIN_SET);
+}
 
+void BLUE_LED_OFF()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9,GPIO_PIN_RESET);
+}
+
+void GREEN_LED_ON()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8,GPIO_PIN_SET);
+}
+
+void GREEN_LED_OFF()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8,GPIO_PIN_RESET);
+}
+
+void RED_LED_ON()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7,GPIO_PIN_SET);
+}
+
+void RED_LED_OFF()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7,GPIO_PIN_RESET);
+}
+
+void BUZZER_ON()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6,GPIO_PIN_RESET);//Buzzer low voltage ON
+}
+
+void BUZZER_OFF()
+{
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_6,GPIO_PIN_SET);//Buzzer high voltage OFF
+}
 /* USER CODE END 4 */
 
 /**
