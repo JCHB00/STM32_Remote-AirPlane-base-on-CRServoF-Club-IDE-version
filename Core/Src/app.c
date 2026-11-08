@@ -15,54 +15,75 @@ static const int OUTPUT_FAILSAFE[NUM_OUTPUTS] = {
 static int s_current_throttle_us = THROTTLE_MIN_US;
 static volatile bool s_volt_failsafe = false;
 
-/* ===================== LED manager ===================== */
-static LedMode  s_led_mode = LED_MODE_OFF;
-static bool     s_led_pin_on = false;
-static uint32_t s_led_next_toggle_ms = 0;
-static bool     s_led_pulse_active = false;
-static uint32_t s_led_pulse_end_ms = 0;
+/* ===================== Status & Warning Variables ===================== */
+static VoltState s_state_6V = VOLT_STATE_NORMAL;
+static VoltState s_state_BEC = VOLT_STATE_NORMAL;
+
+/* External hardware functions defined in main.c */
+extern void BLUE_LED_ON(void);
+extern void BLUE_LED_OFF(void);
+extern void GREEN_LED_ON(void);
+extern void GREEN_LED_OFF(void);
+extern void RED_LED_ON(void);
+extern void RED_LED_OFF(void);
+extern void BUZZER_ON(void);
+extern void BUZZER_OFF(void);
 
 void led_set(bool on) {
-    s_led_pin_on = on;
-    /* Active HIGH per PCB schematic */
-    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    /* Active HIGH per PCB schematic (LED to GND) */
+    HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, on ? GPIO_PIN_RESET : GPIO_PIN_SET);
 }
 
-void app_led_set_mode(LedMode mode) {
-    if (mode == s_led_mode) return;
-    s_led_mode = mode;
-    s_led_next_toggle_ms = HAL_GetTick();
+/* Called from main.c every 100ms to update the current voltage states */
+void app_set_voltage_state(VoltState state_6V, VoltState state_BEC) {
+    s_state_6V = state_6V;
+    s_state_BEC = state_BEC;
 }
 
-void app_led_pulse(uint32_t ms) {
-    s_led_pulse_active = true;
-    s_led_pulse_end_ms = HAL_GetTick() + ms;
-    led_set(true);
-}
+/* Called every loop iteration to update LEDs and Buzzer */
+void app_status_tick(void) {
+    bool link_up = crsf_is_link_up();
+    
+    bool is_crit = (s_state_6V == VOLT_STATE_CRITICAL) || 
+                   (s_state_BEC == VOLT_STATE_CRITICAL) || 
+                   (s_state_6V == VOLT_STATE_VDDA_FAIL);
+    bool is_warn = (s_state_6V == VOLT_STATE_WARN) || 
+                   (s_state_BEC == VOLT_STATE_WARN);
 
-void app_led_tick(void) {
-    uint32_t now = HAL_GetTick();
-    if (s_led_pulse_active) {
-        if ((int32_t)(now - s_led_pulse_end_ms) >= 0) {
-            s_led_pulse_active = false;
-            s_led_next_toggle_ms = now;
-        } else return;
+    /* 1. Green LED: ON only if link is up AND voltage is perfectly normal */
+    if (link_up && !is_warn && !is_crit) {
+        GREEN_LED_ON();
+    } else {
+        GREEN_LED_OFF();
     }
-    switch (s_led_mode) {
-    case LED_MODE_OFF:        led_set(false); break;
-    case LED_MODE_ON:         led_set(true);  break;
-    case LED_MODE_BLINK_SLOW:
-        if ((int32_t)(now - s_led_next_toggle_ms) >= 0) {
-            led_set(!s_led_pin_on);
-            s_led_next_toggle_ms = now + 200; /* 2.5 Hz */
+
+    /* 2. Blue LED: ON if connection failure (link down) */
+    if (!link_up) {
+        BLUE_LED_ON();
+    } else {
+        BLUE_LED_OFF();
+    }
+
+    /* 3. Red LED & On-Board PC13: ON if voltage is CRITICAL */
+    if (is_crit) {
+        RED_LED_ON();
+        
+        /* Determine which battery failed for the PC13 indicator */
+        if (s_state_BEC == VOLT_STATE_CRITICAL || s_state_6V == VOLT_STATE_VDDA_FAIL) {
+            led_set(true);  /* PC13 ON: LiPo/BEC fail (takes priority) */
+        } else if (s_state_6V == VOLT_STATE_CRITICAL) {
+            led_set(false); /* PC13 OFF: 6V Battery Box fail */
         }
-        break;
-    case LED_MODE_BLINK_FAST:
-        if ((int32_t)(now - s_led_next_toggle_ms) >= 0) {
-            led_set(!s_led_pin_on);
-            s_led_next_toggle_ms = now + 100; /* 5 Hz */
-        }
-        break;
+    } else {
+        RED_LED_OFF();
+        led_set(false);
+    }
+
+    /* 4. Buzzer: Solid ON if Red (Critical) OR Blue (Link Fail) is active */
+    if (is_crit || !link_up) {
+        BUZZER_ON();
+    } else {
+        BUZZER_OFF();
     }
 }
 

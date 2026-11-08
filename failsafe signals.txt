@@ -1,0 +1,7 @@
+green led on: all normal
+green led off: voltage warn
+blue led on: connection failure
+red led on: voltage critical
+red led on with on board led (C13) on: LiPo battery fail
+red led on with on board led (C13) off: 6V battery box fail
+buzzer long beeps: red or blue led being on

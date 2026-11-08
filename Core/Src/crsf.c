@@ -49,7 +49,11 @@ void crsf_rx_byte(uint8_t b) {            /* 主循环里逐字节喂进来 */
             s_buf[2] == TYPE_CH) {
             unpack(&s_buf[3]);
             s_lastMs = HAL_GetTick();
-            if (!s_up) { s_up = true; led_set(true); }
+            /* CHANGE: Removed led_set(true). Added throttle reset if reconnect midflight. */
+            if (!s_up) { 
+                s_up = true; 
+                app_reset_throttle_ramp(); 
+            }
             packet_channels();            /* → 立即写 8 路 PWM */
         }
         s_active = false;
@@ -59,7 +63,7 @@ void crsf_rx_byte(uint8_t b) {            /* 主循环里逐字节喂进来 */
 void crsf_check_link(void) {              /* 主循环里周期调用 */
     if (s_up && (HAL_GetTick() - s_lastMs > 300)) {   /* 原版超时 = 300ms [cite] */
         s_up = false;
-        app_led_pulse(80);
+        //app_led_pulse(80); removed as app.c handles LED now
         if (!app_volt_failsafe_active()) {
              failsafe_apply(); /* Only apply if voltage is healthy */
         }

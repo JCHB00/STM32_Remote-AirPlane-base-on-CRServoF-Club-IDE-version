@@ -13,18 +13,18 @@
 void packet_channels(void);   /* 每帧通道数据 → 8 路输出 */
 void failsafe_apply(void);    /* 失控保护动作 */
 
-/* ---- LED manager (single owner of the LED pin) ---- */
+/* ---- Voltage States ---- */
 typedef enum {
-    LED_MODE_OFF = 0,
-    LED_MODE_ON,
-    LED_MODE_BLINK_SLOW,   /* ~2.5 Hz - warning           */
-    LED_MODE_BLINK_FAST,   /* ~5 Hz   - critical / vdda   */
-} LedMode;
+    VOLT_STATE_NORMAL = 0,
+    VOLT_STATE_WARN,
+    VOLT_STATE_CRITICAL,
+    VOLT_STATE_VDDA_FAIL
+} VoltState;
 
-void led_set(bool on);
-void app_led_set_mode(LedMode mode);
-void app_led_pulse(uint32_t ms);
-void app_led_tick(void);
+/* ---- LED & Buzzer Manager ---- */
+void led_set(bool on); // Controls On-Board PC13
+void app_set_voltage_state(VoltState state_6V, VoltState state_BEC);
+void app_status_tick(void);
 
 /* ---- Voltage failsafe latch ---- */
 void app_set_volt_failsafe(bool on);

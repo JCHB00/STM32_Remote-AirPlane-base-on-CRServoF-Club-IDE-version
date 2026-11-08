@@ -182,7 +182,7 @@ int main(void)
   //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ADC_DMA_Buffer, ADC_DMA_BUFFER_SIZE);
   while (1)
   {
-	  app_led_tick();// Must run every loop to handle blinking
+	  app_status_tick();// Must run every loop to handle blinking, handles all LEDs and Buzzer automatically
 
       if (HAL_GetTick() - last_voltage_check_ms >= 100) {
           last_voltage_check_ms = HAL_GetTick();
@@ -251,16 +251,14 @@ int main(void)
               }
           }
 
-          /* Output + LED */
+          /* Hand over the states to the app manager for LED/Buzzer updates */
+          app_set_voltage_state(state_6V, state_BEC);
+
+          /* Failsafe Servo Actions */
           if (state_6V == VOLT_STATE_CRITICAL || state_BEC == VOLT_STATE_CRITICAL || state_6V == VOLT_STATE_VDDA_FAIL) {
-              app_led_set_mode(LED_MODE_BLINK_FAST);
               app_set_volt_failsafe(true);
-              failsafe_apply(); // Use standard failsafe array
-          } else if (state_6V == VOLT_STATE_WARN || state_BEC == VOLT_STATE_WARN) {
-              app_led_set_mode(LED_MODE_BLINK_SLOW);
-              app_set_volt_failsafe(false);
+              failsafe_apply(); 
           } else {
-              app_led_set_mode(LED_MODE_OFF);
               app_set_volt_failsafe(false);
           }
       }
