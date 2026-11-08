@@ -1,0 +1,13 @@
+1. Your progress: How much you have accomplished.
+
+We are building an RC plane controlled by a stm32
+
+In terms of progress, we have used a breadboard to do some testing as well as assembly of some of the circuitry, we have written most of code for the plane, including the data parsing, crsf controlling, and some failsafe protocols. (Show control of the servo with controller) After the receiver gets the eLRS signals, the chip decodes it and sends to the mapped servos and motor for control. Other than that, we build some failsafe for some expected failures that might happen, such as running out of battery midflight, (unplug LiPo battery) sorry for the loud noise, we have a buzzer that will scream if you run out of battery so you can know beforehand or you can have a better chance of finding the plane after it unfortunately crashes. 
+
+2. Any difficulties you have encountered and any suggestions you may need.
+
+We are currently working to see if we can assemble the plane with the PCB board as there are some problems that we encountered with the board, and also since the plane is quite complicated it takes some time to assemble it. Also, we might not able to actually fly this as flying this outdoors, i think is illegal, and indoors is too risky.
+
+3. What to expect in the Final Demo.
+
+We will demonstrate control of the plane without the propellors so it wont fly but the expected results is the stm32 can effectively control the plane by itself as well as trigger any failsafe if anything that may bring risk to the plane.
