@@ -77,12 +77,12 @@ static uint16_t ch5_warn_count = 0;
 static uint16_t ch1_recover_count = 0, ch5_recover_count = 0;
 static uint16_t vdda_fail_count = 0, vdda_recover_count = 0;
 
-typedef enum {
-    VOLT_STATE_NORMAL = 0,
-    VOLT_STATE_WARN,
-    VOLT_STATE_CRITICAL,
-    VOLT_STATE_VDDA_FAIL
-} VoltState;
+//typedef enum {
+//    VOLT_STATE_NORMAL = 0,
+//    VOLT_STATE_WARN,
+//    VOLT_STATE_CRITICAL,
+//    VOLT_STATE_VDDA_FAIL
+//} VoltState;
 
 static VoltState state_6V = VOLT_STATE_NORMAL;
 static VoltState state_BEC = VOLT_STATE_NORMAL;
