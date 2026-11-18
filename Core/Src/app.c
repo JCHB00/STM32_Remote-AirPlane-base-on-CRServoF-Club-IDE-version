@@ -30,7 +30,7 @@ extern void BUZZER_ON(void);
 extern void BUZZER_OFF(void);
 
 void led_set(bool on) {
-    /* Active HIGH per PCB schematic (LED to GND) */
+
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, on ? GPIO_PIN_RESET : GPIO_PIN_SET);
 }
 
@@ -117,15 +117,24 @@ static int apply_throttle_ramp(int target_us) {
     return s_current_throttle_us;
 }
 
-void packet_channels(void) {
+void packet_channels(void) {//**Important
 	if (s_volt_failsafe) return; /* Failsafe owns the servos */
     for (int out = 0; out < NUM_OUTPUTS; out++) {
-        int ch = OUTPUT_MAP[out], us;
-        if (ch > 0) us = (int)crsf_get_channel(ch);
-        else        us = 3000 - (int)crsf_get_channel(-ch);   /* 反相:1500 镜像 */
+        int ch = OUTPUT_MAP[out], us;//the ch is always positive
+        //static const int OUTPUT_MAP[NUM_OUTPUTS] = { 1, 2, 3, 4, 6, 7, 8, 12 }; it means that ch1,ch2,ch3,ch4,ch6,ch7,ch8,ch12
+        if (ch > 0)
+        {
+        	us = (int)crsf_get_channel(ch);//We only used this function
+        }
+        else
+        {
+        	//Ignore
+        	 us = 3000 - (int)crsf_get_channel(-ch);   /* 反相:1500 镜像 *///Never Used, Ignore
+        }
 
         // Apply soft-start specifically to the throttle output channel
-        if (out == THROTTLE_OUTPUT_INDEX) {
+        if (out == THROTTLE_OUTPUT_INDEX)
+        {
             us = apply_throttle_ramp(us);
         }
 

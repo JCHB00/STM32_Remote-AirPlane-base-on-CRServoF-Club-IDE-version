@@ -269,9 +269,9 @@ int main(void)
 	  {
 		  uint8_t b = rxRing[rxTail];
 		  rxTail = (uint16_t)((rxTail + 1) % RX_RING_SIZE);
-		  crsf_rx_byte(b); //call crsf
+		  crsf_rx_byte(b); //call crsf decode
 	  }
-	  crsf_check_link(); //失控檢查
+	  crsf_check_link(); //Check Connection
   }
   /* USER CODE END 3 */
 }

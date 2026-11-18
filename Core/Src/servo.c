@@ -31,7 +31,7 @@ void servo_init(void) {            /* 上电先全部不输出 */
     for (int i = 0; i < NUM_OUTPUTS; i++) { pin_mode(i, 0); g_lastUs[i] = 0; }
 }
 
-void servo_set_us(int i, int us) {
+void servo_set_us(int i, int us) { //Default: 1 tick = 1 µs
     if (us > 0) {
         if (g_lastUs[i] == 0) {    /* 从"停止"恢复 → 先接回定时器 */
             pin_mode(i, 1);

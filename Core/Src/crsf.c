@@ -32,21 +32,21 @@ static void unpack(const uint8_t *p) {
 static uint8_t s_buf[64], s_pos, s_len;   /* 状态机 */
 static bool s_active;
 
-void crsf_rx_byte(uint8_t b) {            /* 主循环里逐字节喂进来 */
+void crsf_rx_byte(uint8_t b) {            /* Decode */
     if (!s_active) {
         if (b == FRAME_HDR) { s_buf[0] = b; s_pos = 1; s_active = true; }
         return;
     }
-    if (s_pos >= sizeof(s_buf)) { s_active = false; return; }
+    if (s_pos >= sizeof(s_buf)) { s_active = false; return; } //Check the data
     s_buf[s_pos++] = b;
-    if (s_pos == 2) {                     /* 长度字节 */
+    if (s_pos == 2) {                     /* Check the Length of byte */
         s_len = b;
-        if (s_len < 3 || s_len > 62) s_active = false;   /* 非法 → 重新找帧头 */
+        if (s_len < 3 || s_len > 62) s_active = false;   /* illegal → re-collect */
         return;
     }
-    if (s_pos == (uint8_t)(s_len + 2)) {  /* 收齐 [0xC8][len][type][payload][crc] */
-        if (crc8(&s_buf[2], s_len - 1) == s_buf[s_len + 1] &&
-            s_buf[2] == TYPE_CH) {
+    if (s_pos == (uint8_t)(s_len + 2)) {  /* if it is legal => contains [0xC8][len][type][payload][crc]*/
+        if (crc8(&s_buf[2], s_len - 1) == s_buf[s_len + 1] && s_buf[2] == TYPE_CH)
+        {
             unpack(&s_buf[3]);
             s_lastMs = HAL_GetTick();
             /* CHANGE: Removed led_set(true). Added throttle reset if reconnect midflight. */
@@ -54,7 +54,7 @@ void crsf_rx_byte(uint8_t b) {            /* 主循环里逐字节喂进来 */
                 s_up = true; 
                 app_reset_throttle_ramp(); 
             }
-            packet_channels();            /* → 立即写 8 路 PWM */
+            packet_channels();            /* → Write 8 channel of PWM */
         }
         s_active = false;
     }
