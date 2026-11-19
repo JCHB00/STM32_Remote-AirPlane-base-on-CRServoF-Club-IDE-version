@@ -79,9 +79,12 @@ void app_status_tick(void) {
         led_set(false);
     }
 
-    /* 4. Buzzer: Solid ON if Red (Critical) OR Blue (Link Fail) is active */
-    if (is_crit || !link_up) {
-        BUZZER_ON();
+    /* 4. Buzzer: Solid ON if Red (Critical) OR Blue (Link Fail) is active OR Controller Button(CH8) ON */
+    bool ch7_on = (crsf_get_channel(7) > 1600);
+    if (is_crit || !link_up ||ch7_on) {
+
+    	BUZZER_ON();
+
     } else {
         BUZZER_OFF();
     }

@@ -167,6 +167,7 @@ int main(void)
   //HAL_ADC_Start(&hadc2);
   //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc_dma_buffer, ADC_BUFFER_SIZE)
   //HAL_ADC_Start_DMA(&hadc1, (uint32_t*)ADC_DMA_Buffer, ADC_DMA_BUFFER_SIZE);
+
   while (1)
   {
 	  app_status_tick();// Must run every loop to handle blinking, handles all LEDs and Buzzer automatically
@@ -198,6 +199,12 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	        //Check the first time connection
+	  //if(Receiver_Connect_First_Time == false && crsf_is_link_up())
+	  //{
+	//	  Receiver_Connect_First_Time = true;
+	  //}
+
 	  while(rxTail != rxHead)//If not full
 	  {
 		  uint8_t b = rxRing[rxTail];
