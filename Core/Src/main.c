@@ -24,6 +24,7 @@
 #include "servo.h"
 #include "crsf.h"
 #include "app.h"
+#include "volt_monitor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -65,27 +66,9 @@ static volatile uint16_t rxTail;   //Pointer
 
 static volatile uint16_t adc_dma_buffer[ADC_DMA_BUFFER_SIZE] = {0};
 
-static uint16_t vref_history[VREF_HISTORY_LEN];
-static uint16_t ch1_history[CH_HISTORY_LEN];
-static uint16_t ch5_history[CH_HISTORY_LEN];
-static uint8_t vref_idx = 0, ch1_idx = 0, ch5_idx = 0;
-static bool vref_filled = false, ch1_filled = false, ch5_filled = false;
-
+static VoltMonitor vm;
 static uint32_t last_voltage_check_ms = 0;
-static uint16_t ch1_warn_count = 0;
-static uint16_t ch5_warn_count = 0;
-static uint16_t ch1_recover_count = 0, ch5_recover_count = 0;
-static uint16_t vdda_fail_count = 0, vdda_recover_count = 0;
-
-//typedef enum {
-//    VOLT_STATE_NORMAL = 0,
-//    VOLT_STATE_WARN,
-//    VOLT_STATE_CRITICAL,
-//    VOLT_STATE_VDDA_FAIL
-//} VoltState;
-
-static VoltState state_6V = VOLT_STATE_NORMAL;
-static VoltState state_BEC = VOLT_STATE_NORMAL;
+static uint32_t acc_bec = 0, acc_6v = 0, acc_vref = 0, acc_n = 0;
 
 /* USER CODE END PV */
 
@@ -160,6 +143,10 @@ int main(void)
         Error_Handler();
     }
 
+      /* Nothing uses the ADC DMA interrupts, so turn them off to free the CPU for the UART */
+  __HAL_DMA_DISABLE_IT(&hdma_adc1, DMA_IT_TC | DMA_IT_HT);
+
+  volt_monitor_init(&vm, HAL_GetTick());
 
   //RED_LED_ON();
   //GREEN_LED_ON();
@@ -184,84 +171,30 @@ int main(void)
   {
 	  app_status_tick();// Must run every loop to handle blinking, handles all LEDs and Buzzer automatically
 
-      if (HAL_GetTick() - last_voltage_check_ms >= 100) {
-          last_voltage_check_ms = HAL_GetTick();
+	  /* --- Voltage monitoring: accumulate every loop, evaluate every 100 ms --- */
+	        acc_bec  += adc_dma_buffer[0];   // CH5 = BEC
+	        acc_6v   += adc_dma_buffer[1];   // CH1 = 6V box
+	        acc_vref += adc_dma_buffer[2];   // Vrefint
+	        acc_n++;
 
-          vref_history[vref_idx++] = adc_dma_buffer[2];
-          if (vref_idx >= VREF_HISTORY_LEN) { vref_idx = 0; vref_filled = true; }
-          ch1_history[ch1_idx++] = adc_dma_buffer[1];
-          if (ch1_idx >= CH_HISTORY_LEN) { ch1_idx = 0; ch1_filled = true; }
-          ch5_history[ch5_idx++] = adc_dma_buffer[0];
-          if (ch5_idx >= CH_HISTORY_LEN) { ch5_idx = 0; ch5_filled = true; }
+	        if ((HAL_GetTick() - last_voltage_check_ms >= 100) && acc_n > 0) {
+	            last_voltage_check_ms = HAL_GetTick();
 
-          uint32_t vref_sum = 0; int vref_n = vref_filled ? VREF_HISTORY_LEN : vref_idx;
-          for (int i = 0; i < vref_n; i++) vref_sum += vref_history[i];
-          uint32_t raw_vref_avg = vref_n ? vref_sum / vref_n : adc_dma_buffer[2];
+	            volt_monitor_update(&vm, last_voltage_check_ms,
+	                                acc_6v / acc_n, acc_bec / acc_n, acc_vref / acc_n);
+	            acc_bec = acc_6v = acc_vref = acc_n = 0;
 
-          uint32_t ch1_sum = 0; int ch1_n = ch1_filled ? CH_HISTORY_LEN : ch1_idx;
-          for (int i = 0; i < ch1_n; i++) ch1_sum += ch1_history[i];
-          uint32_t raw_ch1_avg = ch1_n ? ch1_sum / ch1_n : adc_dma_buffer[1];
+	            app_set_voltage_state(volt_monitor_6v(&vm), volt_monitor_bec(&vm));
 
-          uint32_t ch5_sum = 0; int ch5_n = ch5_filled ? CH_HISTORY_LEN : ch5_idx;
-          for (int i = 0; i < ch5_n; i++) ch5_sum += ch5_history[i];
-          uint32_t raw_ch5_avg = ch5_n ? ch5_sum / ch5_n : adc_dma_buffer[0];
-
-          float Vdda = 3.3f;
-          if (raw_vref_avg > 0) Vdda = (1.20f * 4095.0f) / (float)raw_vref_avg;
-
-          if (Vdda < 3.0f) {
-              vdda_fail_count++; vdda_recover_count = 0;
-              if (vdda_fail_count >= 5) {
-                  state_6V = VOLT_STATE_VDDA_FAIL;
-                  state_BEC = VOLT_STATE_VDDA_FAIL;
-              }
-          } else {
-              vdda_fail_count = 0;
-              if (state_6V == VOLT_STATE_VDDA_FAIL) {
-                  if (++vdda_recover_count >= 10) {
-                      state_6V = VOLT_STATE_NORMAL; state_BEC = VOLT_STATE_NORMAL;
-                      ch1_warn_count = ch5_warn_count = 0;
-                      ch1_recover_count = ch5_recover_count = vdda_recover_count = 0;
-                  }
-              } else {
-                  float V_6V  = (float)raw_ch1_avg * Vdda / 4095.0f * 2.0f;
-                  float V_BEC = (float)raw_ch5_avg * Vdda / 4095.0f * 1.833f;
-
-                  /* CH1 (6V) */
-                  if (state_6V == VOLT_STATE_CRITICAL) {
-                      if (V_6V >= 5.0f) {
-                          if (++ch1_recover_count >= 10) { state_6V = VOLT_STATE_NORMAL; ch1_warn_count = 0; ch1_recover_count = 0; }
-                      } else ch1_recover_count = 0;
-                  } else if (V_6V < 4.8f) {
-                      if (++ch1_warn_count >= 5) { state_6V = VOLT_STATE_CRITICAL; ch1_recover_count = 0; }
-                  } else if (V_6V < 5.0f) {
-                      if (++ch1_warn_count >= 10) state_6V = VOLT_STATE_WARN;
-                  } else { ch1_warn_count = 0; state_6V = VOLT_STATE_NORMAL; }
-
-                  /* CH5 (BEC) */
-                  if (state_BEC == VOLT_STATE_CRITICAL) {
-                      if (V_BEC >= 4.8f) {
-                          if (++ch5_recover_count >= 5) { state_BEC = VOLT_STATE_NORMAL; ch5_warn_count = 0; ch5_recover_count = 0; }
-                      } else ch5_recover_count = 0;
-                  } else if (V_BEC < 4.6f) {
-                      if (++ch5_warn_count >= 5) { state_BEC = VOLT_STATE_CRITICAL; ch5_recover_count = 0; }
-                  } else if (V_BEC < 4.8f) {
-                      if (++ch5_warn_count >= 5) state_BEC = VOLT_STATE_WARN;
-                  } else { ch5_warn_count = 0; state_BEC = VOLT_STATE_NORMAL; }
-              }
-          }
-
-          /* Hand over the states to the app manager for LED/Buzzer updates */
-          app_set_voltage_state(state_6V, state_BEC);
-
-          /* Failsafe Servo Actions */
-          if (state_6V == VOLT_STATE_CRITICAL || state_BEC == VOLT_STATE_CRITICAL || state_6V == VOLT_STATE_VDDA_FAIL) {
-              app_set_volt_failsafe(true);
-              failsafe_apply(); 
-          } else {
-              app_set_volt_failsafe(false);
-          }
-      }
+	            if (volt_monitor_critical(&vm)) {
+	                if (!app_volt_failsafe_active()) {   // only on the transition
+	                    app_set_volt_failsafe(true);
+	                    failsafe_apply();
+	                }
+	            } else {
+	                app_set_volt_failsafe(false);
+	            }
+	        }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
